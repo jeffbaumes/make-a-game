@@ -1,0 +1,16 @@
+[paths]
+source =
+   src/make_a_game
+   */site-packages/make_a_game
+
+[run]
+branch = true
+source =
+    make_a_game
+    tests
+parallel = true
+
+[report]
+show_missing = true
+precision = 2
+omit = *migrations*
