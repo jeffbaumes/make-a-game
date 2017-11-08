@@ -1,0 +1,3 @@
+
+CHUNK_SIZE = 128
+TILE_SIZE = 32
