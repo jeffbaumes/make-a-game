@@ -1,7 +1,7 @@
 import sqlite3
 import pygame
 from opensimplex import OpenSimplex
-from .constants import CHUNK_SIZE, TILE_SIZE
+from .constants import CHUNK_SIZE, TILE_SIZE, MAX_SPEED, MAX_SPRINT
 
 _db = None
 _noise = None
@@ -39,28 +39,36 @@ def gameLoop():
             #     is_blue = not is_blue
 
         pressed = pygame.key.get_pressed()
+        speedlimit = MAX_SPEED
+        if pressed[pygame.K_LSHIFT]:
+            speedlimit = MAX_SPRINT
+
         if pressed[pygame.K_UP]:
-            vy -= 0.1
-        if pressed[pygame.K_DOWN]:
-            vy += 0.1
-        if pressed[pygame.K_LEFT]:
-            vx -= 0.1
-        if pressed[pygame.K_RIGHT]:
-            vx += 0.1
-
-        if abs(vx) < 0.02:
-            vx = 0
-        elif vx > 0:
-            vx -= 0.05
+            if vy >= -speedlimit:
+                vy -= 0.1
+        elif pressed[pygame.K_DOWN]:
+            if vy <= speedlimit:
+                vy += 0.1
+        elif pressed[pygame.K_LEFT]:
+            if vx >= -speedlimit:
+                vx -= 0.1
+        elif pressed[pygame.K_RIGHT]:
+            if vx <= speedlimit:
+                vx += 0.1
         else:
-            vx += 0.05
+            if abs(vx) < 0.02:
+                vx = 0
+            elif vx > 0:
+                vx -= 0.05
+            else:
+                vx += 0.05
 
-        if abs(vy) < 0.02:
-            vy = 0
-        elif vy > 0:
-            vy -= 0.05
-        else:
-            vy += 0.05
+            if abs(vy) < 0.02:
+                vy = 0
+            elif vy > 0:
+                vy -= 0.05
+            else:
+                vy += 0.05
 
         mx += vx
         my += vy
