@@ -45,30 +45,38 @@ def gameLoop():
 
         if pressed[pygame.K_UP]:
             if vy >= -speedlimit:
-                vy -= 0.1
-        elif pressed[pygame.K_DOWN]:
+                vy -= 0.02
+        if pressed[pygame.K_DOWN]:
             if vy <= speedlimit:
-                vy += 0.1
-        elif pressed[pygame.K_LEFT]:
+                vy += 0.02
+        if pressed[pygame.K_LEFT]:
             if vx >= -speedlimit:
-                vx -= 0.1
-        elif pressed[pygame.K_RIGHT]:
+                vx -= 0.02
+        if pressed[pygame.K_RIGHT]:
             if vx <= speedlimit:
-                vx += 0.1
-        else:
-            if abs(vx) < 0.02:
-                vx = 0
-            elif vx > 0:
-                vx -= 0.05
-            else:
-                vx += 0.05
+                vx += 0.02
 
-            if abs(vy) < 0.02:
-                vy = 0
-            elif vy > 0:
-                vy -= 0.05
-            else:
-                vy += 0.05
+        if abs(vx) < 0.02:
+            vx = 0
+        if vx < -speedlimit:
+            vx = -speedlimit
+        if vx > speedlimit:
+            vx = speedlimit
+        if vx > 0 and not pressed[pygame.K_RIGHT]:
+            vx -= 0.02
+        if vx < 0 and not pressed[pygame.K_LEFT]:
+            vx += 0.02
+
+        if abs(vy) < 0.02:
+            vy = 0
+        if vy < -speedlimit:
+            vy = -speedlimit
+        if vy > speedlimit:
+            vy = speedlimit
+        if vy > 0 and not pressed[pygame.K_DOWN]:
+            vy -= 0.02
+        if vy < 0 and not pressed[pygame.K_UP]:
+            vy += 0.02
 
         mx += vx
         my += vy
