@@ -16,7 +16,7 @@ def gameLoop():
     pygame.init()
     sizex = 800
     sizey = 800
-    screen = pygame.display.set_mode((sizex, sizey))
+    screen = pygame.display.set_mode((sizex, sizey), pygame.RESIZABLE)
     done = False
 
     clock = pygame.time.Clock()
@@ -29,6 +29,12 @@ def gameLoop():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 done = True
+            if event.type == pygame.VIDEORESIZE:
+                sizex = event.w
+                sizey = event.h
+                screen = pygame.display.set_mode((sizex,sizey),pygame.RESIZABLE)
+
+
             # if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
             #     is_blue = not is_blue
 
