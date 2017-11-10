@@ -104,7 +104,12 @@ def gameLoop():
                         (nearestX + x - mx)*TILE_SIZE + sizex / 2,
                         (nearestY + y - my)*TILE_SIZE + sizey / 2,
                         TILE_SIZE, TILE_SIZE))
-
+        pygame.draw.rect(
+            screen, (0, 0, 0),
+            pygame.Rect(
+                sizex / 2 - TILE_SIZE / 2,
+                sizey / 2 - TILE_SIZE / 2,
+                TILE_SIZE, TILE_SIZE))
         x = myfont.render(str(round(mx)), False, (0, 0, 0))
         y = myfont.render(str(round(my)), False, (0, 0, 0))
         x2 = myfont.render("X:", False, (0, 0, 0))
