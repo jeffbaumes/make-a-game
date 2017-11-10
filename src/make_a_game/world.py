@@ -1,16 +1,83 @@
 import sqlite3
 import pygame
+import math
 from opensimplex import OpenSimplex
-from .constants import CHUNK_SIZE, TILE_SIZE, MAX_SPEED, MAX_SPRINT
+from .constants import (
+    CHUNK_SIZE,
+    TILE_SIZE,
+    MAX_SPEED,
+    MAX_SPRINT,
+    NOISE_SCALE,
+    MATERIAL_SCALE
+)
 
 _db = None
 _noise = None
 
 
+class Chunk:
+    def __init__(self, cx, cy):
+        self.cx = cx
+        self.cy = cy
 
-# def initGame(db, seed, x, y):
-#     load_area(x, y)
-#     chunk = (int(x / CHUNK_SIZE), int(y / CHUNK_SIZE))
+        self.material = []
+        for x in range(CHUNK_SIZE):
+            row = []
+            for y in range(CHUNK_SIZE):
+                nx = (CHUNK_SIZE * cx + x) / MATERIAL_SCALE
+                ny = (CHUNK_SIZE * cy + y) / MATERIAL_SCALE
+                value = 1 if _noise.noise2d(x=nx, y=ny) > 0.5 else 0
+                row.append(value)
+            self.material.append(row)
+
+        self.noise = []
+        for x in range(CHUNK_SIZE):
+            row = []
+            for y in range(CHUNK_SIZE):
+                nx = (CHUNK_SIZE * cx + x) / NOISE_SCALE
+                ny = (CHUNK_SIZE * cy + y) / NOISE_SCALE
+                value = math.floor(20 * _noise.noise2d(x=nx, y=ny))
+                # Uncomment to show chunk boundaries
+                # value = math.floor(
+                #     20 * _noise.noise2d(x=nx, y=ny) +
+                #     20 * (self.cx % 2) - 20 * (self.cy % 2)
+                # )
+                row.append(value)
+            self.noise.append(row)
+
+    def cell(self, x, y):
+        cellx = x % CHUNK_SIZE
+        celly = y % CHUNK_SIZE
+        return (self.material[cellx][celly], self.noise[cellx][celly])
+
+    def setMaterial(self, x, y, m):
+        cellx = x % CHUNK_SIZE
+        celly = y % CHUNK_SIZE
+        self.material[cellx][celly] = m
+
+
+class World:
+    def __init__(self):
+        self.chunks = {}
+
+    def chunk(self, x, y):
+        cx = math.floor(x / CHUNK_SIZE)
+        cy = math.floor(y / CHUNK_SIZE)
+        if not self.chunks.get(cx):
+            self.chunks[cx] = {}
+        if not self.chunks[cx].get(cy):
+            self.chunks[cx][cy] = Chunk(cx, cy)
+        return self.chunks[cx][cy]
+
+    def cell(self, x, y):
+        return self.chunk(x, y).cell(x, y)
+
+    def setMaterial(self, x, y, m):
+        return self.chunk(x, y).setMaterial(x, y, m)
+
+
+def createScreen(x, y):
+    return pygame.display.set_mode((x, y), pygame.RESIZABLE)
 
 
 def gameLoop():
@@ -19,8 +86,10 @@ def gameLoop():
     myfont = pygame.font.SysFont('Comic Sans MS', 30)
     sizex = 800
     sizey = 800
-    screen = pygame.display.set_mode((sizex, sizey), pygame.RESIZABLE)
+    screen = None
     done = False
+    screen = createScreen(sizex, sizey)
+    world = World()
 
     clock = pygame.time.Clock()
     mx = 0
@@ -35,11 +104,7 @@ def gameLoop():
             if event.type == pygame.VIDEORESIZE:
                 sizex = event.w
                 sizey = event.h
-                screen = pygame.display.set_mode((sizex,sizey),pygame.RESIZABLE)
-
-
-            # if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-            #     is_blue = not is_blue
+                screen = createScreen(sizex, sizey)
 
         pressed = pygame.key.get_pressed()
         speedlimit = MAX_SPEED
@@ -84,20 +149,23 @@ def gameLoop():
         mx += vx
         my += vy
 
-        halfX = int(0.6 * sizex / TILE_SIZE)
-        halfY = int(0.6 * sizey / TILE_SIZE)
-        nearestX = round(mx)
-        nearestY = round(my)
+        halfX = math.floor(0.6 * sizex / TILE_SIZE)
+        halfY = math.floor(0.6 * sizey / TILE_SIZE)
+        nearestX = round(mx - 0.5)
+        nearestY = round(my - 0.5)
+
+        if pressed[pygame.K_SPACE]:
+            world.setMaterial(nearestX, nearestY, 1)
 
         for x in range(-halfX, halfX + 1):
             for y in range(-halfY, halfY + 1):
-                n = _noise.noise2d(x=(nearestX + x)/10, y=(nearestY + y)/10)
-                color = [50, 200, 50]
-                # color = [50, 50, 50] if n < 0 else [50, 200, 50]
-                delta = int(20 * _noise.noise2d(x=(nearestX + x)/5, y=(nearestY + y)/5))
+                (material, delta) = world.cell(nearestX + x, nearestY + y)
+                color = [180, 180, 180] if material else [50, 200, 50]
                 color[0] += delta
                 color[1] += delta
                 color[2] += delta
+                # If mx is at sizex / 2,
+                # nearestX is at (nearestX - mx)*TILE_SIZE + sizex / 2.
                 pygame.draw.rect(
                     screen, color,
                     pygame.Rect(
@@ -107,20 +175,18 @@ def gameLoop():
         pygame.draw.rect(
             screen, (0, 0, 0),
             pygame.Rect(
-                sizex / 2 - TILE_SIZE / 2,
-                sizey / 2 - TILE_SIZE / 2,
-                TILE_SIZE, TILE_SIZE))
+                sizex / 2 - TILE_SIZE / 4,
+                sizey / 2 - TILE_SIZE / 4,
+                TILE_SIZE / 2, TILE_SIZE / 2))
         x = myfont.render(str(round(mx)), False, (0, 0, 0))
         y = myfont.render(str(round(my)), False, (0, 0, 0))
         x2 = myfont.render("X:", False, (0, 0, 0))
-        y2= myfont.render("Y:", False, (0, 0, 0))
+        y2 = myfont.render("Y:", False, (0, 0, 0))
 
-        # (mx, my) is at (sizex / 2, sizey / 2)
-        # (nearestX, nearestY) is at ((nearestX - mx)*TILE_SIZE + sizex / 2, ?)
-        screen.blit(x,(35,0))
-        screen.blit(x2,(0,0))
-        screen.blit(y,(35,25))
-        screen.blit(y2,(0,25))
+        screen.blit(x, (35, 0))
+        screen.blit(x2, (0, 0))
+        screen.blit(y, (35, 25))
+        screen.blit(y2, (0, 25))
         pygame.display.flip()
         clock.tick(60)
 
