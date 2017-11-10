@@ -7,6 +7,7 @@ _db = None
 _noise = None
 
 
+
 # def initGame(db, seed, x, y):
 #     load_area(x, y)
 #     chunk = (int(x / CHUNK_SIZE), int(y / CHUNK_SIZE))
@@ -14,6 +15,8 @@ _noise = None
 
 def gameLoop():
     pygame.init()
+    pygame.font.init()
+    myfont = pygame.font.SysFont('Comic Sans MS', 30)
     sizex = 800
     sizey = 800
     screen = pygame.display.set_mode((sizex, sizey), pygame.RESIZABLE)
@@ -102,9 +105,17 @@ def gameLoop():
                         (nearestY + y - my)*TILE_SIZE + sizey / 2,
                         TILE_SIZE, TILE_SIZE))
 
+        x = myfont.render(str(round(mx)), False, (0, 0, 0))
+        y = myfont.render(str(round(my)), False, (0, 0, 0))
+        x2 = myfont.render("X:", False, (0, 0, 0))
+        y2= myfont.render("Y:", False, (0, 0, 0))
+
         # (mx, my) is at (sizex / 2, sizey / 2)
         # (nearestX, nearestY) is at ((nearestX - mx)*TILE_SIZE + sizex / 2, ?)
-
+        screen.blit(x,(35,0))
+        screen.blit(x2,(0,0))
+        screen.blit(y,(35,25))
+        screen.blit(y2,(0,25))
         pygame.display.flip()
         clock.tick(60)
 
