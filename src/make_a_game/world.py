@@ -5,6 +5,7 @@ import math
 from opensimplex import OpenSimplex
 from .constants import (
     CHUNK_SIZE,
+    USER_SIZE,
     TILE_SIZE,
     MAX_SPEED,
     MAX_SPRINT,
@@ -198,38 +199,66 @@ def gameLoop():
         if vy < 0 and not pressed[pygame.K_UP]:
             vy += 0.02
 
+        userSize = float(USER_SIZE) / TILE_SIZE
+
+        nx = math.floor(mx)
+        ny = math.floor(my)
+
+        minX = mx - 1
+        maxX = mx + 1
+        minY = my - 1
+        maxY = my + 1
+        if (world.cell(nx - 1, ny)[0] or
+                my - ny < userSize / 2 and world.cell(nx - 1, ny - 1)[0] or
+                my - ny > 1 - userSize / 2 and world.cell(nx - 1, ny + 1)[0]):
+            minX = nx + userSize / 2
+        if (world.cell(nx + 1, ny)[0] or
+                my - ny < userSize / 2 and world.cell(nx + 1, ny - 1)[0] or
+                my - ny > 1 - userSize / 2 and world.cell(nx + 1, ny + 1)[0]):
+            maxX = nx + 1 - userSize / 2
+
+        if (world.cell(nx, ny - 1)[0] or
+                mx - nx < userSize / 2 and world.cell(nx - 1, ny - 1)[0] or
+                mx - nx > 1 - userSize / 2 and world.cell(nx + 1, ny - 1)[0]):
+            minY = ny + userSize / 2
+        if (world.cell(nx, ny + 1)[0] or
+                mx - nx < userSize / 2 and world.cell(nx - 1, ny + 1)[0] or
+                mx - nx > 1 - userSize / 2 and world.cell(nx + 1, ny + 1)[0]):
+            maxY = ny + 1 - userSize / 2
+
         mx += vx
         my += vy
 
+        mx = min(maxX, max(minX, mx))
+        my = min(maxY, max(minY, my))
+
         halfX = math.floor(0.6 * sizex / TILE_SIZE)
         halfY = math.floor(0.6 * sizey / TILE_SIZE)
-        nearestX = round(mx - 0.5)
-        nearestY = round(my - 0.5)
 
         if pressed[pygame.K_SPACE]:
-            world.setMaterial(nearestX, nearestY, 1)
+            world.setMaterial(nx, ny, 1)
 
         for x in range(-halfX, halfX + 1):
             for y in range(-halfY, halfY + 1):
-                (material, delta) = world.cell(nearestX + x, nearestY + y)
+                (material, delta) = world.cell(nx + x, ny + y)
                 color = [180, 180, 180] if material else [50, 200, 50]
                 color[0] += delta
                 color[1] += delta
                 color[2] += delta
                 # If mx is at sizex / 2,
-                # nearestX is at (nearestX - mx)*TILE_SIZE + sizex / 2.
+                # nx is at (nx - mx)*TILE_SIZE + sizex / 2.
                 pygame.draw.rect(
                     screen, color,
                     pygame.Rect(
-                        (nearestX + x - mx)*TILE_SIZE + sizex / 2,
-                        (nearestY + y - my)*TILE_SIZE + sizey / 2,
+                        (nx + x - mx)*TILE_SIZE + sizex / 2,
+                        (ny + y - my)*TILE_SIZE + sizey / 2,
                         TILE_SIZE, TILE_SIZE))
         pygame.draw.rect(
             screen, (0, 0, 0),
             pygame.Rect(
-                sizex / 2 - TILE_SIZE / 4,
-                sizey / 2 - TILE_SIZE / 4,
-                TILE_SIZE / 2, TILE_SIZE / 2))
+                sizex / 2 - USER_SIZE / 2,
+                sizey / 2 - USER_SIZE / 2,
+                USER_SIZE, USER_SIZE))
         x = myfont.render(str(round(mx)), False, (0, 0, 0))
         y = myfont.render(str(round(my)), False, (0, 0, 0))
         x2 = myfont.render("X:", False, (0, 0, 0))
