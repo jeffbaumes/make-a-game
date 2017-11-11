@@ -1,8 +1,10 @@
+#imports the modules
 import pickle
 import sqlite3
 import pygame
 import math
 from opensimplex import OpenSimplex
+#gets some needed variables from constants
 from .constants import (
     CHUNK_SIZE,
     TILE_SIZE,
@@ -11,17 +13,17 @@ from .constants import (
     NOISE_SCALE,
     MATERIAL_SCALE
 )
-
+#sets up some variables
 _db = None
 _noise = None
 _username = None
 
-
+#world generater
 class Chunk:
     def __init__(self, cx, cy):
         self.cx = cx
         self.cy = cy
-
+        #stores the material that is on the ground in one chunk
         self.material = []
         for x in range(CHUNK_SIZE):
             row = []
@@ -31,7 +33,7 @@ class Chunk:
                 value = 1 if _noise.noise2d(x=nx, y=ny) > 0.5 else 0
                 row.append(value)
             self.material.append(row)
-
+        #makes the noise for the world
         self.noise = []
         for x in range(CHUNK_SIZE):
             row = []
@@ -41,12 +43,12 @@ class Chunk:
                 value = math.floor(20 * _noise.noise2d(x=nx, y=ny))
                 row.append(value)
             self.noise.append(row)
-
+    #makes the blocks
     def cell(self, x, y):
         cellx = x % CHUNK_SIZE
         celly = y % CHUNK_SIZE
         return (self.material[cellx][celly], self.noise[cellx][celly])
-
+    #changes the material that is on the ground in one chunk
     def setMaterial(self, x, y, m):
         cellx = x % CHUNK_SIZE
         celly = y % CHUNK_SIZE
@@ -207,7 +209,7 @@ def gameLoop():
         nearestY = round(my - 0.5)
 
         if pressed[pygame.K_SPACE]:
-            world.setMaterial(nearestX, nearestY, 1)
+            world.setMaterial(nearestX, nearestY, 2)
 
         for x in range(-halfX, halfX + 1):
             for y in range(-halfY, halfY + 1):
