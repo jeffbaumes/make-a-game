@@ -15,13 +15,12 @@ Why does this file exist, and why not put this in __main__?
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 import click
-from opensimplex import OpenSimplex
-import pygame
 from .world import startGame
 
 
 @click.command()
-@click.option('--seed', default=1)
 @click.option('--world', default='default')
-def main(seed, world):
-    startGame(world, seed)
+@click.option('--seed', default=1)
+@click.option('--user', default='andrew')
+def main(world, seed, user):
+    startGame(world, seed, user)

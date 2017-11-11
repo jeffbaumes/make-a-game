@@ -1,3 +1,4 @@
+import pickle
 import sqlite3
 import pygame
 import math
@@ -13,6 +14,7 @@ from .constants import (
 
 _db = None
 _noise = None
+_username = None
 
 
 class Chunk:
@@ -37,11 +39,6 @@ class Chunk:
                 nx = (CHUNK_SIZE * cx + x) / NOISE_SCALE
                 ny = (CHUNK_SIZE * cy + y) / NOISE_SCALE
                 value = math.floor(20 * _noise.noise2d(x=nx, y=ny))
-                # Uncomment to show chunk boundaries
-                # value = math.floor(
-                #     20 * _noise.noise2d(x=nx, y=ny) +
-                #     20 * (self.cx % 2) - 20 * (self.cy % 2)
-                # )
                 row.append(value)
             self.noise.append(row)
 
@@ -58,6 +55,41 @@ class Chunk:
 
 class World:
     def __init__(self):
+        pass
+
+    def chunk(self, x, y):
+        cx = math.floor(x / CHUNK_SIZE)
+        cy = math.floor(y / CHUNK_SIZE)
+        cur = _db.cursor()
+        cq = cur.execute(
+            'SELECT data FROM chunk WHERE x = ? AND y = ?', (cx, cy))
+        cdata = cq.fetchone()
+        if cdata:
+            return pickle.loads(bytes(cdata[0]))
+        ch = Chunk(cx, cy)
+        self.saveChunk(ch)
+        return ch
+
+    def saveChunk(self, c):
+        cdata = pickle.dumps(c, pickle.HIGHEST_PROTOCOL)
+        cur = _db.cursor()
+        cur.execute(
+            'INSERT INTO chunk (x, y, data) VALUES (?, ?, ?)',
+            (c.cx, c.cy, sqlite3.Binary(cdata)))
+        _db.commit()
+
+    def updateChunk(self, c):
+        cdata = pickle.dumps(c, pickle.HIGHEST_PROTOCOL)
+        cur = _db.cursor()
+        cur.execute(
+            'UPDATE chunk SET data = ? WHERE x = ? AND y = ?',
+            (sqlite3.Binary(cdata), c.cx, c.cy))
+        _db.commit()
+
+
+class WorldCache:
+    def __init__(self, world):
+        self.world = world
         self.chunks = {}
 
     def chunk(self, x, y):
@@ -66,14 +98,16 @@ class World:
         if not self.chunks.get(cx):
             self.chunks[cx] = {}
         if not self.chunks[cx].get(cy):
-            self.chunks[cx][cy] = Chunk(cx, cy)
+            self.chunks[cx][cy] = self.world.chunk(cx, cy)
         return self.chunks[cx][cy]
 
     def cell(self, x, y):
         return self.chunk(x, y).cell(x, y)
 
     def setMaterial(self, x, y, m):
-        return self.chunk(x, y).setMaterial(x, y, m)
+        c = self.chunk(x, y)
+        c.setMaterial(x, y, m)
+        self.world.updateChunk(c)
 
 
 def createScreen(x, y):
@@ -89,17 +123,35 @@ def gameLoop():
     screen = None
     done = False
     screen = createScreen(sizex, sizey)
-    world = World()
+    w = World()
+    world = WorldCache(w)
 
     clock = pygame.time.Clock()
+
     mx = 0
     my = 0
+    c = _db.cursor()
+    c.execute('SELECT * FROM user WHERE name = ?', (_username,))
+    s = c.fetchone()
+    if s:
+        mx = s['x']
+        my = s['y']
+    else:
+        c.execute(
+            'INSERT INTO user (name, x, y) VALUES (?,?,?)',
+            (_username, 0, 0))
+        _db.commit()
+
     vx = 0
     vy = 0
 
     while not done:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                c.execute(
+                    'UPDATE user SET x = ?, y = ? WHERE name = ?',
+                    (mx, my, _username))
+                _db.commit()
                 done = True
             if event.type == pygame.VIDEORESIZE:
                 sizex = event.w
@@ -191,23 +243,33 @@ def gameLoop():
         clock.tick(60)
 
 
-def startGame(world, seed):
+def startGame(world, seed, username):
     global _db
     global _noise
+    global _username
+
+    _username = username
 
     dbName = world + '.db'
     _db = sqlite3.connect(dbName)
+    _db.row_factory = sqlite3.Row
+
     c = _db.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS settings
-        (name VARCHAR PRIMARY KEY, val VARCHAR)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS setting
+        (name TEXT PRIMARY KEY, val TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS chunk
+        (x INT, y INT, data TEXT, PRIMARY KEY (x, y))''')
+    c.execute('''CREATE TABLE IF NOT EXISTS user
+        (name TEXT PRIMARY KEY, x REAL, y REAL)''')
     _db.commit()
-    c.execute('SELECT val FROM settings WHERE name = "seed"')
+
+    c.execute('SELECT val FROM setting WHERE name = "seed"')
     s = c.fetchone()
     if s:
         seed = int(s[0])
     else:
-        c.execute('INSERT INTO settings VALUES ("seed",?)', (str(seed),))
+        c.execute('INSERT INTO setting VALUES ("seed",?)', (str(seed),))
         _db.commit()
+
     _noise = OpenSimplex(seed=seed)
-    print(seed)
     gameLoop()
