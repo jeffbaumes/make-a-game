@@ -98,7 +98,7 @@ class WorldCache:
         if not self.chunks.get(cx):
             self.chunks[cx] = {}
         if not self.chunks[cx].get(cy):
-            self.chunks[cx][cy] = self.world.chunk(cx, cy)
+            self.chunks[cx][cy] = self.world.chunk(x, y)
         return self.chunks[cx][cy]
 
     def cell(self, x, y):
