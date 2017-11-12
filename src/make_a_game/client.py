@@ -9,13 +9,18 @@ from .constants import (
 )
 from twisted.internet import reactor
 from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
-from twisted.protocols.amp import AMP
+from twisted.protocols import amp
 from twisted.internet.task import LoopingCall
-from .server import GetChunk, UpdateChunk
+from .commands import (
+    GetChunk,
+    UpdateMaterial
+)
 import jsonpickle
 
 
 _server = None
+_protocol = None
+_deferred = None
 _username = None
 _mx = 0
 _my = 0
@@ -25,6 +30,14 @@ _myfont = None
 _sizex = 800
 _sizey = 800
 _screen = None
+_world = None
+
+
+class GameClient(amp.AMP):
+    def updateMaterial(self, x, y, material):
+        _world.setMaterial(x, y, material)
+        return {'result': True}
+    UpdateMaterial.responder(updateMaterial)
 
 
 class WorldCache:
@@ -38,20 +51,11 @@ class WorldCache:
             self.chunks[cx] = {}
         if not self.chunks[cx].get(cy) or self.chunks[cx][cy] == 'pending':
             if not self.chunks[cx].get(cy):
-                chunkDeferred = connectProtocol(_server, AMP())
-
-                def handleError(error):
-                    print(error)
-
-                def connected(ampProto):
-                    return ampProto.callRemote(GetChunk, x=x, y=y)
-                chunkDeferred.addCallback(connected)
-                chunkDeferred.addErrback(handleError)
 
                 def receivedChunk(result):
                     self.chunks[cx][cy] = jsonpickle.decode(result['chunk'])
-                chunkDeferred.addCallback(receivedChunk)
-                chunkDeferred.addErrback(handleError)
+                d = _protocol.callRemote(GetChunk, x=x, y=y)
+                d.addCallback(receivedChunk)
                 self.chunks[cx][cy] = 'pending'
 
             return None
@@ -63,27 +67,17 @@ class WorldCache:
             return c.cell(x, y)
         return (1, 0)
 
+    def updateMaterial(self, x, y, m):
+        def updatedMaterial(result):
+            pass
+        d = _protocol.callRemote(
+            UpdateMaterial, x=x, y=y, material=m)
+        d.addCallback(updatedMaterial)
+
     def setMaterial(self, x, y, m):
         c = self.chunk(x, y)
         if c:
             c.setMaterial(x, y, m)
-            chunkDeferred = connectProtocol(_server, AMP())
-
-            def handleError(error):
-                print(error)
-
-            def connected(ampProto):
-                return ampProto.callRemote(
-                    UpdateChunk, chunk=jsonpickle.encode(c))
-            chunkDeferred.addCallback(connected)
-            chunkDeferred.addErrback(handleError)
-
-            def updatedChunk(result):
-                print('Chunk updated')
-            chunkDeferred.addCallback(updatedChunk)
-            chunkDeferred.addErrback(handleError)
-
-        print('Cannot update chunk that is not loaded!')
 
 
 def createScreen(x, y):
@@ -189,7 +183,10 @@ def gameTick():
     halfY = math.floor(0.6 * _sizey / TILE_SIZE)
 
     if pressed[pygame.K_SPACE]:
-        _world.setMaterial(nx, ny, 1)
+        _world.updateMaterial(nx, ny, 1)
+
+    if pressed[pygame.K_b]:
+        _world.updateMaterial(nx, ny, 0)
 
     for x in range(-halfX, halfX + 1):
         for y in range(-halfY, halfY + 1):
@@ -232,6 +229,8 @@ def startGame(username, port):
 
     global _username
     global _server
+    global _protocol
+    global _deferred
     global _myfont
     global _screen
     global _world
@@ -259,8 +258,12 @@ def startGame(username, port):
     _username = username
     _server = TCP4ClientEndpoint(reactor, '127.0.0.1', port)
 
-    # Set up a looping call every 1/30th of a second to run your game tick
-    tick = LoopingCall(gameTick)
-    tick.start(1.0 / DESIRED_FPS)
+    def connected(ampProto):
+        global _protocol
+        _protocol = ampProto
+        # Set up a looping call every 1/30th of a second to run your game tick
+        tick = LoopingCall(gameTick)
+        tick.start(1.0 / DESIRED_FPS)
+    connectProtocol(_server, GameClient()).addCallback(connected)
 
     reactor.run()

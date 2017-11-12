@@ -1,5 +1,7 @@
 from twisted.protocols import amp
 from twisted.python.log import startLogging
+from twisted.internet import reactor
+from twisted.internet.protocol import Factory
 import sqlite3
 from opensimplex import OpenSimplex
 import jsonpickle
@@ -8,6 +10,11 @@ from .constants import (
     CHUNK_SIZE,
     NOISE_SCALE,
     MATERIAL_SCALE
+)
+from .commands import (
+    GetChunk,
+    UpdateChunk,
+    UpdateMaterial
 )
 from sys import stdout
 
@@ -85,46 +92,17 @@ class World:
             (cdata, c.cx, c.cy))
         _db.commit()
 
-
-class Sum(amp.Command):
-    arguments = [(b'a', amp.Integer()),
-                 (b'b', amp.Integer())]
-    response = [(b'total', amp.Integer())]
-
-
-class Divide(amp.Command):
-    arguments = [(b'numerator', amp.Integer()),
-                 (b'denominator', amp.Integer())]
-    response = [(b'result', amp.Float())]
-    errors = {ZeroDivisionError: b'ZERO_DIVISION'}
+    def setMaterial(self, x, y, m):
+        c = self.chunk(x, y)
+        c.setMaterial(x, y, m)
+        self.updateChunk(c)
 
 
-class Math(amp.AMP):
-    def sum(self, a, b):
-        total = a + b
-        print('Did a sum: {} + {} = {}'.format(a, b, total))
-        return {'total': total}
-    Sum.responder(sum)
-
-    def divide(self, numerator, denominator):
-        result = float(numerator) / denominator
-        print('Divided: {} / {} = {}'.format(numerator, denominator, result))
-        return {'result': result}
-    Divide.responder(divide)
-
-
-class GetChunk(amp.Command):
-    arguments = [(b'x', amp.Integer()),
-                 (b'y', amp.Integer())]
-    response = [(b'chunk', amp.Unicode())]
-
-
-class UpdateChunk(amp.Command):
-    arguments = [(b'chunk', amp.Unicode())]
-    response = [(b'result', amp.Boolean())]
+_clients = []
 
 
 class Game(amp.AMP):
+
     def getChunk(self, x, y):
         return {'chunk': jsonpickle.encode(_world.chunk(x, y))}
     GetChunk.responder(getChunk)
@@ -134,16 +112,38 @@ class Game(amp.AMP):
         return {'result': True}
     UpdateChunk.responder(updateChunk)
 
+    def updateMaterial(self, x, y, material):
+        _world.setMaterial(x, y, material)
+        for client in _clients:
+            client.callRemote(UpdateMaterial, x=x, y=y, material=material)
+        return {'result': True}
+    UpdateMaterial.responder(updateMaterial)
+
+    def connectionMade(self):
+        super().connectionMade()
+        _clients.append(self)
+        print('connection made!')
+
+    def connectionLost(self, reason):
+        super().connectionLost(reason)
+        _clients.remove(self)
+        print('connection lost!')
+
+
+class GameFactory(Factory):
+    def __init__(self):
+        self.echoers = []
+
+    def buildProtocol(self, addr):
+        return Game(self)
+
 
 def startServer(world, seed, port):
-    from twisted.internet import reactor
-    from twisted.internet.protocol import Factory
-
     startLogging(stdout)
 
-    pf = Factory()
-    pf.protocol = Game
-    reactor.listenTCP(port, pf)
+    factory = Factory()
+    factory.protocol = Game
+    reactor.listenTCP(port, factory)
 
     global _db
     global _noise
@@ -173,5 +173,4 @@ def startServer(world, seed, port):
     _noise = OpenSimplex(seed=seed)
     _world = World()
 
-    print('started on ', port)
     reactor.run()
