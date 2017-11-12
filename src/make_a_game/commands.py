@@ -17,3 +17,10 @@ class UpdateMaterial(amp.Command):
                  (b'y', amp.Integer()),
                  (b'material', amp.Integer())]
     response = [(b'result', amp.Boolean())]
+
+
+class UpdateUserPosition(amp.Command):
+    arguments = [(b'user', amp.Unicode()),
+                 (b'x', amp.Float()),
+                 (b'y', amp.Float())]
+    response = [(b'result', amp.Boolean())]

@@ -13,7 +13,8 @@ from twisted.protocols import amp
 from twisted.internet.task import LoopingCall
 from .commands import (
     GetChunk,
-    UpdateMaterial
+    UpdateMaterial,
+    UpdateUserPosition
 )
 import jsonpickle
 
@@ -31,6 +32,7 @@ _sizex = 800
 _sizey = 800
 _screen = None
 _world = None
+_playerPositions = {}
 
 
 class GameClient(amp.AMP):
@@ -38,6 +40,11 @@ class GameClient(amp.AMP):
         _world.setMaterial(x, y, material)
         return {'result': True}
     UpdateMaterial.responder(updateMaterial)
+
+    def updateUserPosition(self, user, x, y):
+        _playerPositions[user] = (x, y)
+        return {'result': True}
+    UpdateUserPosition.responder(updateUserPosition)
 
 
 class WorldCache:
@@ -70,6 +77,7 @@ class WorldCache:
     def updateMaterial(self, x, y, m):
         if self.cell(x, y)[0] == m:
             return
+        self.setMaterial(x, y, m)
 
         def updatedMaterial(result):
             pass
@@ -182,6 +190,8 @@ def gameTick():
     _mx = min(maxX, max(minX, _mx))
     _my = min(maxY, max(minY, _my))
 
+    _protocol.callRemote(UpdateUserPosition, user=_username, x=_mx, y=_my)
+
     halfX = math.floor(0.6 * _sizex / TILE_SIZE)
     halfY = math.floor(0.6 * _sizey / TILE_SIZE)
 
@@ -212,6 +222,15 @@ def gameTick():
             _sizex / 2 - USER_SIZE / 2,
             _sizey / 2 - USER_SIZE / 2,
             USER_SIZE, USER_SIZE))
+    for user, pos in _playerPositions.items():
+        if user != _username:
+            pygame.draw.rect(
+                _screen, (200, 0, 0),
+                pygame.Rect(
+                    _sizex / 2 - USER_SIZE / 2 - (_mx - pos[0]) * TILE_SIZE,
+                    _sizey / 2 - USER_SIZE / 2 - (_my - pos[1]) * TILE_SIZE,
+                    USER_SIZE, USER_SIZE))
+
     x = _myfont.render(str(round(_mx)), False, (0, 0, 0))
     y = _myfont.render(str(round(_my)), False, (0, 0, 0))
     x2 = _myfont.render("X:", False, (0, 0, 0))
@@ -224,7 +243,7 @@ def gameTick():
     pygame.display.flip()
 
 
-def startGame(username, port):
+def startGame(username, host, port):
     from twisted.python.log import startLogging
     from sys import stdout
 
@@ -259,7 +278,7 @@ def startGame(username, port):
     #     _db.commit()
 
     _username = username
-    _server = TCP4ClientEndpoint(reactor, '192.168.1.55', port)
+    _server = TCP4ClientEndpoint(reactor, host, port)
 
     def connected(ampProto):
         global _protocol

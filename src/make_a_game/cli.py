@@ -19,7 +19,8 @@ from .client import startGame
 
 
 @click.command()
+@click.option('--host', default='127.0.0.1')
 @click.option('--port', default=1234)
 @click.option('--user', default='andrew')
-def main(user, port):
-    startGame(user, port)
+def main(user, host, port):
+    startGame(user, host, port)

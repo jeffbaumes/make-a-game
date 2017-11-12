@@ -14,7 +14,8 @@ from .constants import (
 from .commands import (
     GetChunk,
     UpdateChunk,
-    UpdateMaterial
+    UpdateMaterial,
+    UpdateUserPosition
 )
 from sys import stdout
 
@@ -119,6 +120,12 @@ class Game(amp.AMP):
         return {'result': True}
     UpdateMaterial.responder(updateMaterial)
 
+    def updateUserPosition(self, user, x, y):
+        for client in _clients:
+            client.callRemote(UpdateUserPosition, user=user, x=x, y=y)
+        return {'result': True}
+    UpdateUserPosition.responder(updateUserPosition)
+
     def connectionMade(self):
         super().connectionMade()
         _clients.append(self)
@@ -128,14 +135,6 @@ class Game(amp.AMP):
         super().connectionLost(reason)
         _clients.remove(self)
         print('connection lost!')
-
-
-class GameFactory(Factory):
-    def __init__(self):
-        self.echoers = []
-
-    def buildProtocol(self, addr):
-        return Game(self)
 
 
 def startServer(world, seed, port):
