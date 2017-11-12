@@ -68,6 +68,9 @@ class WorldCache:
         return (1, 0)
 
     def updateMaterial(self, x, y, m):
+        if self.cell(x, y)[0] == m:
+            return
+
         def updatedMaterial(result):
             pass
         d = _protocol.callRemote(
@@ -256,7 +259,7 @@ def startGame(username, port):
     #     _db.commit()
 
     _username = username
-    _server = TCP4ClientEndpoint(reactor, '127.0.0.1', port)
+    _server = TCP4ClientEndpoint(reactor, '192.168.1.55', port)
 
     def connected(ampProto):
         global _protocol
