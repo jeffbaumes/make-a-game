@@ -15,11 +15,12 @@ Why does this file exist, and why not put this in __main__?
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 import click
-from .client import startGame
+from .server import startServer
 
 
 @click.command()
+@click.option('--world', default='default')
+@click.option('--seed', default=1)
 @click.option('--port', default=1234)
-@click.option('--user', default='andrew')
-def main(user, port):
-    startGame(user, port)
+def main(world, seed, port):
+    startServer(world, seed, port)

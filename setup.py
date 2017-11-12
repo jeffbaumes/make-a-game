@@ -77,6 +77,7 @@ setup(
     entry_points={
         'console_scripts': [
             'make-a-game = make_a_game.cli:main',
+            'make-a-game-server = make_a_game.server_cli:main',
         ]
     },
 )
