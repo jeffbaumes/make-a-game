@@ -95,6 +95,18 @@ def createScreen(x, y):
     return pygame.display.set_mode((x, y), pygame.RESIZABLE)
 
 
+def pixelToGame(pt):
+    x = (pt[0] - _sizex / 2.0) / TILE_SIZE + _mx
+    y = (pt[1] - _sizey / 2.0) / TILE_SIZE + _my
+    return (x, y)
+
+
+def gameToPixel(pt):
+    x = (pt[0] - _mx) * TILE_SIZE + _sizex / 2.0
+    y = (pt[1] - _my) * TILE_SIZE + _sizey / 2.0
+    return (x, y)
+
+
 def gameTick():
     global _mx
     global _my
@@ -108,32 +120,34 @@ def gameTick():
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             reactor.stop()
-            # c.execute(
-            #     'UPDATE user SET x = ?, y = ? WHERE name = ?',
-            #     (_mx, _my, _username))
-            # _db.commit()
         if event.type == pygame.VIDEORESIZE:
             _sizex = event.w
             _sizey = event.h
             _screen = createScreen(_sizex, _sizey)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            pygame.event.set_grab(True)
+            pygame.mouse.set_visible(False)
 
     pressed = pygame.key.get_pressed()
     speedlimit = MAX_SPEED
     if pressed[pygame.K_LSHIFT]:
         speedlimit = MAX_SPRINT
 
-    if pressed[pygame.K_UP]:
+    if pressed[pygame.K_w]:
         if _vy >= -speedlimit:
             _vy -= 0.02
-    if pressed[pygame.K_DOWN]:
+    if pressed[pygame.K_s]:
         if _vy <= speedlimit:
             _vy += 0.02
-    if pressed[pygame.K_LEFT]:
+    if pressed[pygame.K_a]:
         if _vx >= -speedlimit:
             _vx -= 0.02
-    if pressed[pygame.K_RIGHT]:
+    if pressed[pygame.K_d]:
         if _vx <= speedlimit:
             _vx += 0.02
+    if pressed[pygame.K_ESCAPE]:
+        pygame.event.set_grab(False)
+        pygame.mouse.set_visible(True)
 
     if abs(_vx) < 0.02:
         _vx = 0
@@ -141,9 +155,9 @@ def gameTick():
         _vx = -speedlimit
     if _vx > speedlimit:
         _vx = speedlimit
-    if _vx > 0 and not pressed[pygame.K_RIGHT]:
+    if _vx > 0 and not pressed[pygame.K_d]:
         _vx -= 0.02
-    if _vx < 0 and not pressed[pygame.K_LEFT]:
+    if _vx < 0 and not pressed[pygame.K_a]:
         _vx += 0.02
 
     if abs(_vy) < 0.02:
@@ -152,9 +166,9 @@ def gameTick():
         _vy = -speedlimit
     if _vy > speedlimit:
         _vy = speedlimit
-    if _vy > 0 and not pressed[pygame.K_DOWN]:
+    if _vy > 0 and not pressed[pygame.K_s]:
         _vy -= 0.02
-    if _vy < 0 and not pressed[pygame.K_UP]:
+    if _vy < 0 and not pressed[pygame.K_w]:
         _vy += 0.02
 
     userSize = float(USER_SIZE) / TILE_SIZE
@@ -195,11 +209,22 @@ def gameTick():
     halfX = math.floor(0.6 * _sizex / TILE_SIZE)
     halfY = math.floor(0.6 * _sizey / TILE_SIZE)
 
+    px, py = pygame.mouse.get_pos()
+    px = max(px, _sizex / 2.0 - 3.0 * TILE_SIZE)
+    px = min(px, _sizex / 2.0 + 3.0 * TILE_SIZE)
+    py = max(py, _sizey / 2.0 - 3.0 * TILE_SIZE)
+    py = min(py, _sizey / 2.0 + 3.0 * TILE_SIZE)
+    if pygame.event.get_grab():
+        pygame.mouse.set_pos((px, py))
+    oxRaw, oyRaw = pixelToGame((px, py))
+    ox = math.floor(oxRaw)
+    oy = math.floor(oyRaw)
+
     if pressed[pygame.K_SPACE]:
-        _world.updateMaterial(nx, ny, 1)
+        _world.updateMaterial(ox, oy, 1)
 
     if pressed[pygame.K_b]:
-        _world.updateMaterial(nx, ny, 0)
+        _world.updateMaterial(ox, oy, 0)
 
     for x in range(-halfX, halfX + 1):
         for y in range(-halfY, halfY + 1):
@@ -208,28 +233,41 @@ def gameTick():
             color[0] += delta
             color[1] += delta
             color[2] += delta
-            # If _mx is at _sizex / 2,
-            # nx is at (nx - _mx)*TILE_SIZE + _sizex / 2.
+            tx, ty = gameToPixel((nx + x, ny + y))
             pygame.draw.rect(
                 _screen, color,
-                pygame.Rect(
-                    (nx + x - _mx)*TILE_SIZE + _sizex / 2,
-                    (ny + y - _my)*TILE_SIZE + _sizey / 2,
-                    TILE_SIZE, TILE_SIZE))
+                pygame.Rect(tx, ty, TILE_SIZE, TILE_SIZE))
+    ux, uy = gameToPixel((_mx, _my))
     pygame.draw.rect(
         _screen, (0, 0, 0),
         pygame.Rect(
-            _sizex / 2 - USER_SIZE / 2,
-            _sizey / 2 - USER_SIZE / 2,
+            ux - USER_SIZE / 2.0,
+            uy - USER_SIZE / 2.0,
             USER_SIZE, USER_SIZE))
     for user, pos in _playerPositions.items():
         if user != _username:
+            playerX, playerY = gameToPixel(pos)
             pygame.draw.rect(
                 _screen, (200, 0, 0),
                 pygame.Rect(
-                    _sizex / 2 - USER_SIZE / 2 - (_mx - pos[0]) * TILE_SIZE,
-                    _sizey / 2 - USER_SIZE / 2 - (_my - pos[1]) * TILE_SIZE,
+                    playerX - USER_SIZE / 2,
+                    playerY - USER_SIZE / 2,
                     USER_SIZE, USER_SIZE))
+    boxX, boxY = gameToPixel((ox, oy))
+    pygame.draw.rect(
+        _screen, (0, 0, 0),
+        pygame.Rect(
+            boxX, boxY,
+            TILE_SIZE, TILE_SIZE
+        ), 1)
+    pygame.draw.line(
+        _screen, (0, 0, 0),
+        (px - 4, py),
+        (px + 4, py))
+    pygame.draw.line(
+        _screen, (0, 0, 0),
+        (px, py - 4),
+        (px, py + 4))
 
     x = _myfont.render(str(round(_mx)), False, (0, 0, 0))
     y = _myfont.render(str(round(_my)), False, (0, 0, 0))
@@ -261,22 +299,11 @@ def startGame(username, host, port):
 
     pygame.init()
     pygame.font.init()
+    pygame.event.set_grab(True)
+    pygame.mouse.set_visible(False)
     _myfont = pygame.font.SysFont('Comic Sans MS', 30)
     _screen = createScreen(_sizex, _sizey)
     _world = WorldCache()
-
-    # c = _db.cursor()
-    # c.execute('SELECT * FROM user WHERE name = ?', (_username,))
-    # s = c.fetchone()
-    # if s:
-    #     _mx = s['x']
-    #     _my = s['y']
-    # else:
-    #     c.execute(
-    #         'INSERT INTO user (name, x, y) VALUES (?,?,?)',
-    #         (_username, 0, 0))
-    #     _db.commit()
-
     _username = username
     _server = TCP4ClientEndpoint(reactor, host, port)
 

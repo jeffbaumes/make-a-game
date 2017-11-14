@@ -24,6 +24,19 @@ _noise = None
 _world = None
 
 
+# c = _db.cursor()
+# c.execute('SELECT * FROM user WHERE name = ?', (_username,))
+# s = c.fetchone()
+# if s:
+#     _mx = s['x']
+#     _my = s['y']
+# else:
+#     c.execute(
+#         'INSERT INTO user (name, x, y) VALUES (?,?,?)',
+#         (_username, 0, 0))
+#     _db.commit()
+
+
 class Chunk:
     def __init__(self, cx, cy):
         self.cx = cx
