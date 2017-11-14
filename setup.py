@@ -67,6 +67,10 @@ setup(
     ],
     install_requires=[
         'click',
+        'jsonpickle',
+        'opensimplex',
+        'pygame',
+        'twisted'
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
     ],
     extras_require={

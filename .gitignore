@@ -1,6 +1,7 @@
 *.py[cod]
 *.db
 make-a-game
+env
 
 # C extensions
 *.so
