@@ -116,7 +116,7 @@ def gameTick():
     global _sizex
     global _sizey
     global _screen
-
+    #grab = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             reactor.stop()
@@ -124,10 +124,10 @@ def gameTick():
             _sizex = event.w
             _sizey = event.h
             _screen = createScreen(_sizex, _sizey)
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            pygame.event.set_grab(True)
-            pygame.mouse.set_visible(False)
-
+        # if event.type == pygame.MOUSEBUTTONDOWN:
+        #     pygame.event.set_grab(True)
+        #     pygame.mouse.set_visible(False)
+        #     grab = True
     pressed = pygame.key.get_pressed()
     speedlimit = MAX_SPEED
     if pressed[pygame.K_LSHIFT]:
@@ -145,10 +145,10 @@ def gameTick():
     if pressed[pygame.K_d]:
         if _vx <= speedlimit:
             _vx += 0.02
-    if pressed[pygame.K_ESCAPE]:
-        pygame.event.set_grab(False)
-        pygame.mouse.set_visible(True)
-
+    # if pressed[pygame.K_ESCAPE]:
+    #     pygame.event.set_grab(False)
+    #     pygame.mouse.set_visible(True)
+    #     grab = False
     if abs(_vx) < 0.02:
         _vx = 0
     if _vx < -speedlimit:
@@ -281,7 +281,26 @@ def gameTick():
     pygame.display.flip()
 
 
-def startGame(username, host, port):
+def startGame(username, host, port, world, seed):
+    if host == '__builtin__':
+        # Start a server as a subprocess
+        import subprocess
+        import time
+        import sys
+        serverProc = subprocess.Popen([
+            'make-a-game-server',
+            '--world', world,
+            '--seed', str(seed),
+            '--port', str(port)
+        ], stdout=sys.stdout, stderr=sys.stderr)
+        time.sleep(1)
+
+        import atexit
+        def doExit():
+            print('Stopping server...')
+            serverProc.terminate()
+        atexit.register(doExit)
+
     from twisted.python.log import startLogging
     from sys import stdout
 
@@ -299,13 +318,17 @@ def startGame(username, host, port):
 
     pygame.init()
     pygame.font.init()
-    pygame.event.set_grab(True)
-    pygame.mouse.set_visible(False)
+    #pygame.event.set_grab(True)
+    #pygame.mouse.set_visible(False)
     _myfont = pygame.font.SysFont('Comic Sans MS', 30)
     _screen = createScreen(_sizex, _sizey)
     _world = WorldCache()
     _username = username
-    _server = TCP4ClientEndpoint(reactor, host, port)
+    if host == '__builtin__':
+        connectionHost = 'localhost'
+    else:
+        connectionHost = host
+    _server = TCP4ClientEndpoint(reactor, connectionHost, port)
 
     def connected(ampProto):
         global _protocol
