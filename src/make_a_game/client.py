@@ -119,12 +119,15 @@ def play():
         import subprocess
         import time
         import sys
-        serverProc = subprocess.Popen([
-            'make-a-game-server',
+        import os
+        command = os.path.join(os.path.dirname(sys.executable), 'make-a-game-server')
+        args = [
+            command,
             '--world', game.worldName,
             '--seed', str(game.seed),
             '--port', str(game.port)
-        ], stdout=sys.stdout, stderr=sys.stderr)
+        ]
+        serverProc = subprocess.Popen(args, stdout=sys.stdout, stderr=sys.stderr)
         time.sleep(1)
 
         import atexit

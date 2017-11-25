@@ -118,8 +118,6 @@ class Chunk:
 
         horizontal = orientation == 0
 
-        print(x, y, width, height)
-
         # where will the wall be drawn from?
         wx = x + (0 if horizontal else randint(0, (width-3)/2)*2 + 1)
         wy = y + (randint(0, (height-3)/2)*2 + 1 if horizontal else 0)
@@ -127,8 +125,6 @@ class Chunk:
         # where will the passage through the wall exist?
         px = wx + (randint(0, (width-1)/2)*2 if horizontal else 0)
         py = wy + (0 if horizontal else randint(0, (height-1)/2)*2)
-
-        print(wx, wy)
 
         # what direction will the wall be drawn?
         dx = 1 if horizontal else 0
