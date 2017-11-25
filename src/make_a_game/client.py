@@ -175,7 +175,7 @@ def gamestart():
         multiplayerImg = pygame.image.load(os.path.join(path, 'multiplayer.png'))
         bg = pygame.image.load(os.path.join(path, 'backround.png'))
         playImg = pygame.image.load(os.path.join(path, 'PLAY.png'))
-        playpressedImg = pygame.image.load(path, 'PLAY_pressed.png'))
+        playpressedImg = pygame.image.load(os.path.join(path, 'PLAY_pressed.png'))
         game.screen.blit(pygame.transform.scale(bg, (game.sizex, game.sizey)), (0, 0))
         button1Rect = pygame.Rect((0, 0), playImg.get_size())
         button2Rect = pygame.Rect((0, 0), multiplayerImg.get_size())
