@@ -1,3 +1,4 @@
+from twisted.internet.protocol import DatagramProtocol
 from twisted.protocols import amp
 from twisted.python.log import startLogging
 from twisted.internet import reactor
@@ -37,6 +38,24 @@ _world = None
 #     _db.commit()
 
 
+class MulticastPingPong(DatagramProtocol):
+
+    def startProtocol(self):
+        """
+        Called after protocol has started listening.
+        """
+        # Set the TTL>1 so multicast will cross router hops:
+        self.transport.setTTL(5)
+        # Join a specific multicast group:
+        self.transport.joinGroup("228.0.0.5")
+
+    def datagramReceived(self, datagram, address):
+        print("Datagram %s received from %s" % (repr(datagram), repr(address)))
+        if datagram == b"Client: Ping":
+            # Rather than replying to the group multicast address, we send the
+            # reply directly (unicast) to the originating port:
+            self.transport.write(b"Server: Pong", ("228.0.0.5", 8005))
+            self.transport.write(b"Server: Pong", ("228.0.0.5", 8005))
 class Chunk:
     def __init__(self, cx, cy):
         self.cx = cx
@@ -184,5 +203,8 @@ def startServer(world, seed, port):
 
     _noise = OpenSimplex(seed=seed)
     _world = World()
-
+    reactor.listenMulticast(8005, MulticastPingPong(),
+                        listenMultiple=True)
+    # tick = LoopingCall(gameTick)
+    # tick.start(1.0 / DESIRED_FPS)
     reactor.run()
