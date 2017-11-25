@@ -7,10 +7,13 @@ import sqlite3
 from opensimplex import OpenSimplex
 import jsonpickle
 import math
+from random import randint
 from .constants import (
+    BIOME_SCALE,
     CHUNK_SIZE,
     NOISE_SCALE,
-    MATERIAL_SCALE
+    MATERIAL_SCALE,
+    Biomes
 )
 from .commands import (
     GetChunk,
@@ -61,15 +64,36 @@ class Chunk:
         self.cx = cx
         self.cy = cy
 
-        self.material = []
-        for x in range(CHUNK_SIZE):
-            row = []
-            for y in range(CHUNK_SIZE):
-                nx = (CHUNK_SIZE * cx + x) / MATERIAL_SCALE
-                ny = (CHUNK_SIZE * cy + y) / MATERIAL_SCALE
-                value = 1 if _noise.noise2d(x=nx, y=ny) > 0.5 else 0
-                row.append(value)
-            self.material.append(row)
+        nx = cx / BIOME_SCALE
+        ny = cy / BIOME_SCALE
+        biome = Biomes.MAZE if _noise.noise2d(x=nx, y=ny) > 0.2 else Biomes.GRASS
+
+        if biome == Biomes.MAZE:
+            self.material = []
+            px = randint(0, (CHUNK_SIZE - 1 - 3)/2)*2 + 1
+            py = randint(0, (CHUNK_SIZE - 1 - 3)/2)*2 + 1
+            for x in range(CHUNK_SIZE):
+                row = []
+                for y in range(CHUNK_SIZE):
+                    if x == 0 and y != py:
+                        row.append(1)
+                    elif y == 0 and x != px:
+                        row.append(1)
+                    else:
+                        row.append(0)
+                self.material.append(row)
+            self.divideMaze(1, 1, CHUNK_SIZE - 1, CHUNK_SIZE - 1, self.chooseMazeOrientation(CHUNK_SIZE, CHUNK_SIZE))
+
+        else:
+            self.material = []
+            for x in range(CHUNK_SIZE):
+                row = []
+                for y in range(CHUNK_SIZE):
+                    nx = (CHUNK_SIZE * cx + x) / MATERIAL_SCALE
+                    ny = (CHUNK_SIZE * cy + y) / MATERIAL_SCALE
+                    value = 1 if _noise.noise2d(x=nx, y=ny) > 0.5 else 0
+                    row.append(value)
+                self.material.append(row)
 
         self.noise = []
         for x in range(CHUNK_SIZE):
@@ -80,6 +104,52 @@ class Chunk:
                 value = math.floor(20 * _noise.noise2d(x=nx, y=ny))
                 row.append(value)
             self.noise.append(row)
+
+    def chooseMazeOrientation(self, width, height):
+        if width < height:
+            return 0
+        if height < width:
+            return 1
+        return randint(0, 1)
+
+    def divideMaze(self, x, y, width, height, orientation):
+        if width < 3 or height < 3:
+            return
+
+        horizontal = orientation == 0
+
+        print(x, y, width, height)
+
+        # where will the wall be drawn from?
+        wx = x + (0 if horizontal else randint(0, (width-3)/2)*2 + 1)
+        wy = y + (randint(0, (height-3)/2)*2 + 1 if horizontal else 0)
+
+        # where will the passage through the wall exist?
+        px = wx + (randint(0, (width-1)/2)*2 if horizontal else 0)
+        py = wy + (0 if horizontal else randint(0, (height-1)/2)*2)
+
+        print(wx, wy)
+
+        # what direction will the wall be drawn?
+        dx = 1 if horizontal else 0
+        dy = 0 if horizontal else 1
+
+        # how long will the wall be?
+        length = width if horizontal else height
+
+        for _ in range(length):
+            if wx != px or wy != py:
+                self.material[wy][wx] = 1
+            wx += dx
+            wy += dy
+
+        nx, ny = x, y
+        w, h =  [width, wy-y] if horizontal else [wx-x, height]
+        self.divideMaze(nx, ny, w, h, self.chooseMazeOrientation(w, h))
+
+        nx, ny = [x, wy+1] if horizontal else [wx+1, y]
+        w, h =  [width, y+height-wy-1] if horizontal else [x+width-wx-1, height]
+        self.divideMaze(nx, ny, w, h, self.chooseMazeOrientation(w, h))
 
     def cell(self, x, y):
         cellx = x % CHUNK_SIZE
