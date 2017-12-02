@@ -1,6 +1,6 @@
 import pygame
 import math
-from .game import game
+from .game import game, images
 from .blocks import (
     GRASS,
     STONE,
@@ -9,8 +9,6 @@ from .blocks import (
 from .constants import (
     CHUNK_SIZE,
     DESIRED_FPS,
-    USER_SIZE,
-    TILE_SIZE,
     MAX_SPEED,
     MAX_SPRINT
 )
@@ -25,7 +23,8 @@ from .commands import (
     UpdateUserPosition
 )
 import jsonpickle
-
+bg_images = images.bg_images
+button_images = images.button_images
 
 class MulticastPingClient(DatagramProtocol):
 
@@ -101,14 +100,14 @@ def createScreen(x, y):
 
 
 def pixelToGame(pt):
-    x = (pt[0] - game.sizex / 2.0) / TILE_SIZE + game.mx
-    y = (pt[1] - game.sizey / 2.0) / TILE_SIZE + game.my
+    x = (pt[0] - game.sizex / 2.0) / game.tileSize + game.mx
+    y = (pt[1] - game.sizey / 2.0) / game.tileSize + game.my
     return (x, y)
 
 
 def gameToPixel(pt):
-    x = (pt[0] - game.mx) * TILE_SIZE + game.sizex / 2.0
-    y = (pt[1] - game.my) * TILE_SIZE + game.sizey / 2.0
+    x = (pt[0] - game.mx) * game.tileSize + game.sizex / 2.0
+    y = (pt[1] - game.my) * game.tileSize + game.sizey / 2.0
     return (x, y)
 
 
@@ -174,32 +173,26 @@ def gamestart():
             clicked = True
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'imgs')
     if game.screen_number == 0:
-        multiplayer_pressedImg = pygame.image.load(os.path.join(path, 'multiplayer_pressed.png'))
-        multiplayerImg = pygame.image.load(os.path.join(path, 'multiplayer.png'))
-        bg = pygame.image.load(os.path.join(path, 'backround.png'))
-        playImg = pygame.image.load(os.path.join(path, 'PLAY.png'))
-        playpressedImg = pygame.image.load(os.path.join(path, 'PLAY_pressed.png'))
-        game.screen.blit(pygame.transform.scale(bg, (game.sizex, game.sizey)), (0, 0))
-        button1Rect = pygame.Rect((0, 0), playImg.get_size())
-        button2Rect = pygame.Rect((0, 0), multiplayerImg.get_size())
+        game.screen.blit(pygame.transform.scale(bg_images["start_bg"], (game.sizex, game.sizey)), (0, 0))
+        button1Rect = pygame.Rect((0, 0), button_images["play_button"].get_size())
+        button2Rect = pygame.Rect((0, 0), button_images["multiplayer_button"].get_size())
         button1Rect.center = (game.sizex/2, game.sizey/2)
         button2Rect.center = (game.sizex/2, game.sizey/2+70)
         if button1Rect.collidepoint(mouse):
-            game.screen.blit(playpressedImg, button1Rect.topleft)
+            game.screen.blit(button_images["play_button_pressed"], button1Rect.topleft)
             if clicked:
-                game.screen_number = "singlplayer"
+                game.screen_number = "singleplayer"
                 play()
         else:
-            game.screen.blit(playImg, button1Rect.topleft)
+            game.screen.blit(button_images["play_button"], button1Rect.topleft)
         if button2Rect.collidepoint(mouse):
-            game.screen.blit(multiplayer_pressedImg, button2Rect.topleft)
+            game.screen.blit(button_images["multiplayer_button_pressed"], button2Rect.topleft)
             if clicked:
                 game.screen_number = "multiplayer"
         else:
-            game.screen.blit(multiplayerImg, button2Rect.topleft)
+            game.screen.blit(button_images["multiplayer_button"], button2Rect.topleft)
     elif game.screen_number == "multiplayer":
-        lan_bg = pygame.image.load(os.path.join(path, 'lan_backround.png'))
-        game.screen.blit(pygame.transform.scale(lan_bg, (game.sizex, game.sizey)), (0, 0))
+        game.screen.blit(pygame.transform.scale(bg_images["lan_bg"], (game.sizex, game.sizey)), (0, 0))
 
         # for name in lan_games:
         #     pass
@@ -226,7 +219,16 @@ def gameTick():
     speedlimit = MAX_SPEED
     if pressed[pygame.K_LSHIFT]:
         speedlimit = MAX_SPRINT
-
+    if pressed[pygame.K_UP]:
+        game.fly = True
+    if pressed[pygame.K_LEFT]:
+        game.tileSize *= 1.1
+        game.tileSize = round(game.tileSize)
+    if pressed[pygame.K_RIGHT]:
+        game.tileSize /= 1.1
+        game.tileSize = round(game.tileSize)
+    if pressed[pygame.K_DOWN]:
+        game.fly = False
     if pressed[pygame.K_w]:
         if game.vy >= -speedlimit:
             game.vy -= 0.02
@@ -265,32 +267,37 @@ def gameTick():
     if game.vy < 0 and not pressed[pygame.K_w]:
         game.vy += 0.02
 
-    userSize = float(USER_SIZE) / TILE_SIZE
+    userSize = 0.5
 
     nx = math.floor(game.mx)
     ny = math.floor(game.my)
 
-    minX = game.mx - 1
-    maxX = game.mx + 1
-    minY = game.my - 1
-    maxY = game.my + 1
-    if (game.world.cell(nx - 1, ny)[0] or
-            game.my - ny < userSize / 2 and game.world.cell(nx - 1, ny - 1)[0] or
-            game.my - ny > 1 - userSize / 2 and game.world.cell(nx - 1, ny + 1)[0]):
-        minX = nx + userSize / 2
-    if (game.world.cell(nx + 1, ny)[0] or
-            game.my - ny < userSize / 2 and game.world.cell(nx + 1, ny - 1)[0] or
-            game.my - ny > 1 - userSize / 2 and game.world.cell(nx + 1, ny + 1)[0]):
-        maxX = nx + 1 - userSize / 2
+    minX = game.mx - 1.0
+    maxX = game.mx + 1.0
+    minY = game.my - 1.0
+    maxY = game.my + 1.0
+    if not game.fly:
+        if (game.world.cell(nx - 1, ny)[0] or
+                game.my - ny < userSize / 2 and game.world.cell(nx - 1, ny - 1)[0] or
+                game.my - ny > 1 - userSize / 2 and game.world.cell(nx - 1, ny + 1)[0]):
 
-    if (game.world.cell(nx, ny - 1)[0] or
-            game.mx - nx < userSize / 2 and game.world.cell(nx - 1, ny - 1)[0] or
-            game.mx - nx > 1 - userSize / 2 and game.world.cell(nx + 1, ny - 1)[0]):
-        minY = ny + userSize / 2
-    if (game.world.cell(nx, ny + 1)[0] or
-            game.mx - nx < userSize / 2 and game.world.cell(nx - 1, ny + 1)[0] or
-            game.mx - nx > 1 - userSize / 2 and game.world.cell(nx + 1, ny + 1)[0]):
-        maxY = ny + 1 - userSize / 2
+            minX = nx + userSize / 2
+        if (game.world.cell(nx + 1, ny)[0] or
+                game.my - ny < userSize / 2 and game.world.cell(nx + 1, ny - 1)[0] or
+                game.my - ny > 1 - userSize / 2 and game.world.cell(nx + 1, ny + 1)[0]):
+
+            maxX = nx + 1 - userSize / 2
+
+        if (game.world.cell(nx, ny - 1)[0] or
+                game.mx - nx < userSize / 2 and game.world.cell(nx - 1, ny - 1)[0] or
+                game.mx - nx > 1 - userSize / 2 and game.world.cell(nx + 1, ny - 1)[0]):
+
+            minY = ny + userSize / 2
+        if (game.world.cell(nx, ny + 1)[0] or
+                game.mx - nx < userSize / 2 and game.world.cell(nx - 1, ny + 1)[0] or
+                game.mx - nx > 1 - userSize / 2 and game.world.cell(nx + 1, ny + 1)[0]):
+
+            maxY = ny + 1 - userSize / 2
 
     game.mx += game.vx
     game.my += game.vy
@@ -300,14 +307,14 @@ def gameTick():
 
     game.protocol.callRemote(UpdateUserPosition, user=game.username, x=game.mx, y=game.my)
 
-    halfX = math.floor(0.6 * game.sizex / TILE_SIZE)
-    halfY = math.floor(0.6 * game.sizey / TILE_SIZE)
+    halfX = math.floor(0.6 * game.sizex / game.tileSize)
+    halfY = math.floor(0.6 * game.sizey / game.tileSize)
 
     px, py = pygame.mouse.get_pos()
-    px = max(px, game.sizex / 2.0 - 3.0 * TILE_SIZE)
-    px = min(px, game.sizex / 2.0 + 3.0 * TILE_SIZE)
-    py = max(py, game.sizey / 2.0 - 3.0 * TILE_SIZE)
-    py = min(py, game.sizey / 2.0 + 3.0 * TILE_SIZE)
+    px = max(px, game.sizex / 2.0 - 3.0 * game.tileSize)
+    px = min(px, game.sizex / 2.0 + 3.0 * game.tileSize)
+    py = max(py, game.sizey / 2.0 - 3.0 * game.tileSize)
+    py = min(py, game.sizey / 2.0 + 3.0 * game.tileSize)
     if pygame.event.get_grab():
         pygame.mouse.set_pos((px, py))
     oxRaw, oyRaw = pixelToGame((px, py))
@@ -339,14 +346,14 @@ def gameTick():
             tx, ty = gameToPixel((nx + x, ny + y))
             pygame.draw.rect(
                 game.screen, color,
-                pygame.Rect(tx, ty, TILE_SIZE, TILE_SIZE))
+                pygame.Rect(tx, ty, game.tileSize, game.tileSize))
     ux, uy = gameToPixel((game.mx, game.my))
     pygame.draw.rect(
         game.screen, (0, 0, 0),
         pygame.Rect(
-            ux - USER_SIZE / 2.0,
-            uy - USER_SIZE / 2.0,
-            USER_SIZE, USER_SIZE))
+            ux - game.tileSize / 2 / 2.0,
+            uy - game.tileSize / 2 / 2.0,
+            game.tileSize / 2, game.tileSize / 2))
 
     for user, pos in game.playerPositions.items():
         if user != game.username:
@@ -354,15 +361,15 @@ def gameTick():
             pygame.draw.rect(
                 game.screen, (200, 0, 0),
                 pygame.Rect(
-                    playerX - USER_SIZE / 2,
-                    playerY - USER_SIZE / 2,
-                    USER_SIZE, USER_SIZE))
+                    playerX - game.tileSize / 2 / 2,
+                    playerY - game.tileSize / 2 / 2,
+                    game.tileSize / 2, game.tileSize / 2))
     boxX, boxY = gameToPixel((ox, oy))
     pygame.draw.rect(
         game.screen, (0, 0, 0),
         pygame.Rect(
             boxX, boxY,
-            TILE_SIZE, TILE_SIZE
+            game.tileSize, game.tileSize
         ), 1)
     pygame.draw.line(
         game.screen, (0, 0, 0),
